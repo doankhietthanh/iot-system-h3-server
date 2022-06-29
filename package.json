@@ -1,0 +1,24 @@
+{
+  "name": "iot-system",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "proxy": "http://localhost:8080",
+  "scripts": {
+    "start": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.1",
+    "firebase": "^9.8.4",
+    "node-fetch": "^3.2.6",
+    "nodemailer": "^6.7.5",
+    "request": "^2.88.2",
+    "socket.io": "^4.5.1"
+  }
+}
