@@ -24,8 +24,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const routes = appRouter(app, fs);
 
-àas;
-
 const convertDateToTimestamp = (date, time) => {
   const time1 = date.split(",")[1].split("/");
   const dateStr =
@@ -42,40 +40,13 @@ const convertDateToTimestamp = (date, time) => {
 let docsHistory = {};
 let docsLocation = {};
 
-// let nameLocationList = [];
-// let nodeList = [];
+let nameLocationList = [];
+let nodeList = [];
 onValue(ref(database, "location"), (snapshot) => {
   const data = snapshot.val();
   console.log(data);
-  const nameLocationList = Object.keys(data);
-  const nodeList = Object.values(data);
-
-  setTimeout(() => {
-    nameLocationList.forEach((nameLocation, index) => {
-      const nodeName = Object.keys(nodeList[index]);
-      let docsNewNode = {};
-      nodeName.forEach((node) => {
-        let docsNewTime = {};
-        onValue(
-          ref(database, "location/" + nameLocation + "/" + node),
-          (snapshot) => {
-            const data = snapshot.val();
-            const timestamp = convertDateToTimestamp(data.time);
-
-            docsHistory[timestamp] = {
-              [nameLocation]: {
-                [node]: data.sensors,
-              },
-            };
-
-            docsNewTime[timestamp] = data.sensors;
-            docsNewNode[node] = { ...docsNewTime };
-            docsLocation[nameLocation] = { ...docsNewNode };
-          }
-        );
-      });
-    });
-  }, 2000);
+  nameLocationList = Object.keys(data);
+  nodeList = Object.values(data);
 
   request.post({
     headers: { "content-type": "application/json" },
@@ -93,6 +64,33 @@ onValue(ref(database, "location"), (snapshot) => {
 
   io.emit("location", { ...docsLocation });
 });
+
+setTimeout(() => {
+  nameLocationList.forEach((nameLocation, index) => {
+    const nodeName = Object.keys(nodeList[index]);
+    let docsNewNode = {};
+    nodeName.forEach((node) => {
+      let docsNewTime = {};
+      onValue(
+        ref(database, "location/" + nameLocation + "/" + node),
+        (snapshot) => {
+          const data = snapshot.val();
+          const timestamp = convertDateToTimestamp(data.time);
+
+          docsHistory[timestamp] = {
+            [nameLocation]: {
+              [node]: data.sensors,
+            },
+          };
+
+          docsNewTime[timestamp] = data.sensors;
+          docsNewNode[node] = { ...docsNewTime };
+          docsLocation[nameLocation] = { ...docsNewNode };
+        }
+      );
+    });
+  });
+}, 2000);
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));
