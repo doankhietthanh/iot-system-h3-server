@@ -11,8 +11,11 @@ export const locationRoutes = (app, fs) => {
       if (err) {
         throw err;
       }
-
-      callback(returnJson ? JSON.parse(data) : data);
+      try {
+        callback(returnJson ? JSON.parse(data) : data);
+      } catch (err) {
+        console.log(err);
+      }
     });
   };
 
@@ -60,6 +63,27 @@ export const locationRoutes = (app, fs) => {
   app.post("/location", (req, res) => {
     readFile((data) => {
       data = req.body;
+
+      // console.log(data);
+
+      writeFile(JSON.stringify(data, null, 2), () => {
+        res.status(200).send("new location added");
+      });
+    }, true);
+  });
+
+  app.post("/location/:name/:node", (req, res) => {
+    readFile((data) => {
+      const name = req.params.name;
+      const node = req.params.node;
+
+      data[name] = {
+        [node]: req.body,
+      };
+
+      console.log(data);
+
+      console.log({ [name]: { [node]: req.body } });
 
       writeFile(JSON.stringify(data, null, 2), () => {
         res.status(200).send("new location added");

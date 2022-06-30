@@ -11,8 +11,11 @@ export const historyRoutes = (app, fs) => {
       if (err) {
         throw err;
       }
-
-      callback(returnJson ? JSON.parse(data) : data);
+      try {
+        callback(returnJson ? JSON.parse(data) : data);
+      } catch (err) {
+        console.log(err);
+      }
     });
   };
 
@@ -69,6 +72,8 @@ export const historyRoutes = (app, fs) => {
   app.post("/history", (req, res) => {
     readFile((data) => {
       data = req.body;
+
+      // console.log(data);
 
       writeFile(JSON.stringify(data, null, 2), () => {
         res.status(200).send("new history added");
