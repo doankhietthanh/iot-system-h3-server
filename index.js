@@ -44,7 +44,7 @@ let nameLocationList = [];
 let nodeList = [];
 let docsValueSensorsThreshold = {};
 let docsNameSensor = [];
-let docs1 = {};
+let docsHistoryCurrent = {};
 
 fs.readFile(dataHistory, (err, data) => {
   docsHistory = JSON.parse(data);
@@ -56,7 +56,6 @@ fs.readFile(dataLocation, (err, data) => {
 
 onValue(ref(database, "settings/sensor"), (snapshot) => {
   docsValueSensorsThreshold = snapshot.val();
-  docsNameSensor = Object.keys(docsValueSensorsThreshold);
 });
 
 onValue(ref(database, "location"), (snapshot) => {
@@ -77,14 +76,10 @@ onValue(ref(database, "location"), (snapshot) => {
   });
 
   io.emit("history", { ...docsHistory });
-});
 
-setTimeout(() => {
   nameLocationList.forEach((nameLocation, index) => {
-    let docsNewNode = {};
     const nodeName = Object.keys(nodeList[index]);
     nodeName.forEach((node) => {
-      let docsNewTime = {};
       onValue(
         ref(database, "location/" + nameLocation + "/" + node),
         (snapshot) => {
@@ -97,21 +92,28 @@ setTimeout(() => {
             },
           };
 
-          docsNewTime[data.time] = { ...data.sensors };
-          docsNewNode[node] = { ...docsNewTime };
-          // docsLocation[nameLocation] = { ...docsNewNode };
-
-          console.log("-------------");
-          docs1 = docsLocation[nameLocation][node];
-          docs1[data.time] = data.sensors;
-          docsLocation[nameLocation][node] = { ...docs1 };
-          console.log(docsLocation);
-          console.log("-------------");
+          if (docsLocation[nameLocation] != undefined) {
+            if (docsLocation[nameLocation][node] != undefined) {
+              docsHistoryCurrent = docsLocation[nameLocation][node];
+              docsHistoryCurrent[timestamp] = data.sensors;
+              docsLocation[nameLocation][node] = docsHistoryCurrent;
+            } else {
+              docsLocation[nameLocation][node] = {
+                [timestamp]: data.sensors,
+              };
+            }
+          } else {
+            docsLocation[nameLocation] = {
+              [node]: {
+                [timestamp]: data.sensors,
+              },
+            };
+          }
         }
       );
     });
   });
-}, 5000);
+});
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));
