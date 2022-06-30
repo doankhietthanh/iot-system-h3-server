@@ -51,9 +51,14 @@ const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
 
 let docsHistory = {};
+let docsHistoryPrevious = {};
 let docsLocation = {};
+let docsLocationPrevious = {};
+
 let docsValueSensorsThreshold = {};
 let docsHistoryCurrent = {};
+let nameLocationList = [];
+let nodeList = [];
 
 fs.readFile(dataHistory, (err, data) => {
   docsHistory = JSON.parse(data);
@@ -63,77 +68,91 @@ fs.readFile(dataLocation, (err, data) => {
   docsLocation = JSON.parse(data);
 });
 
-function sleep(ms) {
-  var d = new Date();
-  var d2 = null;
-  do {
-    d2 = new Date();
-  } while (d2 - d < ms);
-}
 onValue(ref(database, "settings/sensor"), (snapshot) => {
   docsValueSensorsThreshold = snapshot.val();
 });
 
-onValue(ref(database, "location"), (snapshot) => {
+get(child(ref(database), "location")).then((snapshot) => {
   const data = snapshot.val();
-  const nameLocationList = Object.keys(data);
-  const nodeList = Object.values(data);
+  console.log(data);
+  nameLocationList = Object.keys(data);
+  nodeList = Object.values(data);
 
-  request.post({
-    headers: { "content-type": "application/json" },
-    url: endPoint + "current",
-    body: JSON.stringify(data),
-  });
+  // request.post({
+  //   headers: { "content-type": "application/json" },
+  //   url: endPoint + "current",
+  //   body: JSON.stringify(data),
+  // });
 
-  request.post({
-    headers: { "content-type": "application/json" },
-    url: endPoint + "history",
-    body: JSON.stringify({ ...docsHistory }),
-  });
+  //io.emit("history", { ...docsHistory });
+});
 
-  request.post({
-    headers: { "content-type": "application/json" },
-    url: endPoint + "location",
-    body: JSON.stringify({ ...docsLocation }),
-  });
-
-  io.emit("history", { ...docsHistory });
-
+setTimeout(() => {
   nameLocationList.forEach((nameLocation, index) => {
     const nameNodeList = Object.keys(nodeList[index]);
     const valueNodeList = Object.values(nodeList[index]);
     nameNodeList.forEach((node, i) => {
-      // console.log(valueNodeList[i]);
-      const dataSensors = valueNodeList[i];
-      // console.log(dataSensors);
-      const timestamp = convertDateToTimestamp(dataSensors.time);
+      onValue(
+        ref(database, "location/" + nameLocation + "/" + node),
+        (snapshot) => {
+          const data = snapshot.val();
+          // console.log(data);
+          const timestamp = convertDateToTimestamp(data.time);
+          docsHistoryPrevious = docsHistory;
+          docsHistory[timestamp] = {
+            [nameLocation]: {
+              [node]: data.sensors,
+            },
+          };
 
-      docsHistory[timestamp] = {
-        [nameLocation]: {
-          [node]: dataSensors.sensors,
-        },
-      };
-      docsLocation[nameLocation][node][timestamp] = dataSensors.sensors;
-      // if (docsLocation[nameLocation] != undefined) {
-      //   if (docsLocation[nameLocation][node] != undefined) {
-      //     docsHistoryCurrent = docsLocation[nameLocation][node];
-      //     docsHistoryCurrent[timestamp] = dataSensors.sensors;
-      //     docsLocation[nameLocation][node] = docsHistoryCurrent;
-      //   } else {
-      //     docsLocation[nameLocation][node] = {
-      //       [timestamp]: dataSensors.sensors,
-      //     };
-      //   }
-      // } else {
-      //   docsLocation[nameLocation] = {
-      //     [node]: {
-      //       [timestamp]: dataSensors.sensors,
-      //     },
-      //   };
-      // }
+          request.post({
+            headers: { "content-type": "application/json" },
+            url: endPoint + "history",
+            body: "",
+          });
+
+          request.post({
+            headers: { "content-type": "application/json" },
+            url: endPoint + "history",
+            body: JSON.stringify(docsHistory),
+          });
+
+          docsLocation[nameLocation][node][timestamp] = data.sensors;
+
+          request.post({
+            headers: { "content-type": "application/json" },
+            url: endPoint + "location",
+            body: "",
+          });
+
+          request.post({
+            headers: { "content-type": "application/json" },
+            url: endPoint + "location",
+            body: JSON.stringify(docsLocation),
+          });
+
+          // if (docsLocation[nameLocation] != undefined) {
+          //   if (docsLocation[nameLocation][node] != undefined) {
+          //     docsHistoryCurrent = docsLocation[nameLocation][node];
+          //     docsHistoryCurrent[timestamp] = data.sensors;
+          //     docsLocation[nameLocation][node] = docsHistoryCurrent;
+          //   } else {
+          //     docsLocation[nameLocation][node] = {
+          //       [timestamp]: data.sensors,
+          //     };
+          //   }
+          // } else {
+          //   docsLocation[nameLocation] = {
+          //     [node]: {
+          //       [timestamp]: data.sensors,
+          //     },
+          //   };
+          // }
+        }
+      );
     });
   });
-});
+}, 5000);
 
 setInterval(() => {
   request(endPoint + "current", function (error, response, body) {

@@ -71,15 +71,9 @@ export const historyRoutes = (app, fs) => {
 
   // CREATE
   app.post("/history", (req, res) => {
-    readFile((data) => {
-      data = req.body;
-
-      // console.log(data);
-
-      writeFile(JSON.stringify(data, null, 2), () => {
-        res.status(200).send("new history added");
-      });
-    }, true);
+    writeFile(JSON.stringify(req.body, null, 2), () => {
+      res.status(200).send("new history added");
+    });
   });
 
   // UPDATE
