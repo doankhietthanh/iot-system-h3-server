@@ -44,8 +44,8 @@ const convertDateToTimestamp = (date, time) => {
   return date2.getTime();
 };
 
-// const endPoint = "https://iot-system-h3-server.herokuapp.com/";
-const endPoint = "http://localhost:8080/";
+const endPoint = "https://iot-system-h3-server.herokuapp.com/";
+// const endPoint = "http://localhost:8080/";
 
 const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
@@ -260,5 +260,5 @@ const sendEmail = (data, action) => {
   });
 };
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));
