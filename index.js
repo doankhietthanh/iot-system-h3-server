@@ -4,7 +4,15 @@ import express from "express";
 import nodemailer from "nodemailer";
 import fs from "fs";
 import request from "request";
-import { database, onValue, ref } from "./controller/firebase.js";
+import {
+  database,
+  onValue,
+  ref,
+  set,
+  update,
+  get,
+  child,
+} from "./controller/firebase.js";
 import { appRouter } from "./routes/routes.js";
 
 const app = express();
@@ -40,8 +48,8 @@ const dataHistory = "./data/history.json";
 
 let docsHistory = {};
 let docsLocation = {};
-let nameLocationList = [];
-let nodeList = [];
+// let nameLocationList = [];
+// let nodeList = [];
 let docsValueSensorsThreshold = {};
 let docsNameSensor = [];
 let docsHistoryCurrent = {};
@@ -54,14 +62,28 @@ fs.readFile(dataLocation, (err, data) => {
   docsLocation = JSON.parse(data);
 });
 
+function sleep(ms) {
+  var d = new Date();
+  var d2 = null;
+  do {
+    d2 = new Date();
+  } while (d2 - d < ms);
+}
 onValue(ref(database, "settings/sensor"), (snapshot) => {
   docsValueSensorsThreshold = snapshot.val();
+  docsNameSensor = Object.keys(docsValueSensorsThreshold);
 });
 
 onValue(ref(database, "location"), (snapshot) => {
   const data = snapshot.val();
-  nameLocationList = Object.keys(data);
-  nodeList = Object.values(data);
+  const nameLocationList = Object.keys(data);
+  const nodeList = Object.values(data);
+
+  request.post({
+    headers: { "content-type": "application/json" },
+    url: "http://localhost:8080/current",
+    body: JSON.stringify(data),
+  });
 
   request.post({
     headers: { "content-type": "application/json" },
@@ -114,6 +136,119 @@ onValue(ref(database, "location"), (snapshot) => {
     });
   });
 });
+
+setInterval(() => {
+  request("http://localhost:8080/current", function (error, response, body) {
+    const data = JSON.parse(body);
+    const nameLocationList = Object.keys(data);
+    const nodeList = Object.values(data);
+    nameLocationList.forEach((nameLocation, index) => {
+      const nameNodeList = Object.keys(nodeList[index]);
+      const valueNodeList = Object.values(nodeList[index]);
+      nameNodeList.forEach((nameNode, i) => {
+        const valueNode = valueNodeList[i];
+        const nameSensorList = Object.keys(valueNode.sensors);
+        const valueSensorList = Object.values(valueNode.sensors);
+        let nameSensorThresholdList = [];
+        let valueSensorThresholdList = [];
+        if (valueSensorList.every((value) => value == -1)) {
+          sendEmail(
+            nameLocation,
+            nameNode,
+            nameSensorThresholdList,
+            valueSensorThresholdList,
+            "offline"
+          );
+        } else {
+          nameSensorList.forEach((nameSensor, j) => {
+            if (
+              parseInt(valueSensorList[j]) <
+              docsValueSensorsThreshold[nameSensor].minT
+            ) {
+              nameSensorThresholdList.push(nameSensor);
+              valueSensorThresholdList.push(valueSensorList[j]);
+            }
+          });
+
+          sendEmail(
+            nameLocation,
+            nameNode,
+            nameSensorThresholdList,
+            valueSensorThresholdList,
+            "threshold"
+          );
+        }
+      });
+    });
+  });
+}, 5 * 60000);
+
+const sendEmail = (
+  nameLocation,
+  nameNode,
+  nameSensorList,
+  valueSensorList,
+  action
+) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "19119220@student.hcmute.edu.vn", // generated ethereal user
+      pass: "Thanh2001@", // generated ethereal password
+    },
+  });
+  let email;
+  if (action == "threshold") {
+    let tableHtml = "";
+    nameSensorList.forEach((nameSensor, index) => {
+      tableHtml += `
+      <tr>
+        <td style="text-transform: uppercase;" >${nameSensor}</td>
+        <td>${valueSensorList[index]}</td>
+      </tr>
+      `;
+    });
+    email = {
+      from: "19119220@student.hcmute.edu.vn",
+      to: "19119088@student.hcmute.edu.vn",
+      subject: "OVERLOAD THRESHOLD WARNING ⚠️⚠️⚠️",
+      html: `
+      <h4>OVERLOAD THRESHOLD WARNING ⚠️⚠️⚠️</h4>
+      <h3 style="text-transform: uppercase;">${nameLocation} - ${nameNode}</h3>
+      </table>
+        <thead>
+          <tr>
+            <th>Sensor</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${tableHtml}
+        </tbody>
+
+      </table>`,
+    };
+  } else if (action == "offline") {
+    email = {
+      from: "19119220@student.hcmute.edu.vn",
+      to: "19119088@student.hcmute.edu.vn",
+      subject: "DISCONNECTED NODE ❌❌❌",
+      html: `
+      <h4>DISCONNECTED NODE ❌❌❌</h4>
+      <h3 style="text-transform: uppercase;">${nameLocation} - ${nameNode} <span> is disconnected ❎</span></h3>
+      `,
+    };
+  }
+
+  transporter.sendMail(email, (err, data) => {
+    if (err) {
+      console.log("Send Error");
+    } else {
+      console.log("Send Success");
+    }
+  });
+};
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));

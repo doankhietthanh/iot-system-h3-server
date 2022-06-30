@@ -1,5 +1,6 @@
 import { historyRoutes } from "./history.js";
 import { locationRoutes } from "./location.js";
+import { currentRoutes } from "./current.js";
 
 export const appRouter = (app, fs) => {
   app.get("/", (req, res) => {
@@ -8,4 +9,5 @@ export const appRouter = (app, fs) => {
 
   historyRoutes(app, fs);
   locationRoutes(app, fs);
+  currentRoutes(app, fs);
 };
