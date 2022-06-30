@@ -43,15 +43,16 @@ const convertDateToTimestamp = (date, time) => {
   const date2 = new Date(+year, month - 1, +day, +hours, +minutes, +seconds);
   return date2.getTime();
 };
+
+// const endPoint = "https://iot-system-h3-server.herokuapp.com/";
+const endPoint = "http://localhost:8080/";
+
 const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
 
 let docsHistory = {};
 let docsLocation = {};
-// let nameLocationList = [];
-// let nodeList = [];
 let docsValueSensorsThreshold = {};
-let docsNameSensor = [];
 let docsHistoryCurrent = {};
 
 fs.readFile(dataHistory, (err, data) => {
@@ -71,7 +72,6 @@ function sleep(ms) {
 }
 onValue(ref(database, "settings/sensor"), (snapshot) => {
   docsValueSensorsThreshold = snapshot.val();
-  docsNameSensor = Object.keys(docsValueSensorsThreshold);
 });
 
 onValue(ref(database, "location"), (snapshot) => {
@@ -81,64 +81,62 @@ onValue(ref(database, "location"), (snapshot) => {
 
   request.post({
     headers: { "content-type": "application/json" },
-    url: "http://localhost:8080/current",
+    url: endPoint + "current",
     body: JSON.stringify(data),
   });
 
   request.post({
     headers: { "content-type": "application/json" },
-    url: "http://localhost:8080/history",
+    url: endPoint + "history",
     body: JSON.stringify({ ...docsHistory }),
   });
 
   request.post({
     headers: { "content-type": "application/json" },
-    url: "http://localhost:8080/location",
+    url: endPoint + "location",
     body: JSON.stringify({ ...docsLocation }),
   });
 
   io.emit("history", { ...docsHistory });
 
   nameLocationList.forEach((nameLocation, index) => {
-    const nodeName = Object.keys(nodeList[index]);
-    nodeName.forEach((node) => {
-      onValue(
-        ref(database, "location/" + nameLocation + "/" + node),
-        (snapshot) => {
-          const data = snapshot.val();
-          const timestamp = convertDateToTimestamp(data.time);
+    const nameNodeList = Object.keys(nodeList[index]);
+    const valueNodeList = Object.values(nodeList[index]);
+    nameNodeList.forEach((node, i) => {
+      // console.log(valueNodeList[i]);
+      const dataSensors = valueNodeList[i];
+      // console.log(dataSensors);
+      const timestamp = convertDateToTimestamp(dataSensors.time);
 
-          docsHistory[timestamp] = {
-            [nameLocation]: {
-              [node]: data.sensors,
-            },
-          };
-
-          if (docsLocation[nameLocation] != undefined) {
-            if (docsLocation[nameLocation][node] != undefined) {
-              docsHistoryCurrent = docsLocation[nameLocation][node];
-              docsHistoryCurrent[timestamp] = data.sensors;
-              docsLocation[nameLocation][node] = docsHistoryCurrent;
-            } else {
-              docsLocation[nameLocation][node] = {
-                [timestamp]: data.sensors,
-              };
-            }
-          } else {
-            docsLocation[nameLocation] = {
-              [node]: {
-                [timestamp]: data.sensors,
-              },
-            };
-          }
-        }
-      );
+      docsHistory[timestamp] = {
+        [nameLocation]: {
+          [node]: dataSensors.sensors,
+        },
+      };
+      docsLocation[nameLocation][node][timestamp] = dataSensors.sensors;
+      // if (docsLocation[nameLocation] != undefined) {
+      //   if (docsLocation[nameLocation][node] != undefined) {
+      //     docsHistoryCurrent = docsLocation[nameLocation][node];
+      //     docsHistoryCurrent[timestamp] = dataSensors.sensors;
+      //     docsLocation[nameLocation][node] = docsHistoryCurrent;
+      //   } else {
+      //     docsLocation[nameLocation][node] = {
+      //       [timestamp]: dataSensors.sensors,
+      //     };
+      //   }
+      // } else {
+      //   docsLocation[nameLocation] = {
+      //     [node]: {
+      //       [timestamp]: dataSensors.sensors,
+      //     },
+      //   };
+      // }
     });
   });
 });
 
 setInterval(() => {
-  request("http://localhost:8080/current", function (error, response, body) {
+  request(endPoint + "current", function (error, response, body) {
     const data = JSON.parse(body);
     const nameLocationList = Object.keys(data);
     const nodeList = Object.values(data);

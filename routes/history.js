@@ -13,6 +13,7 @@ export const historyRoutes = (app, fs) => {
       }
       try {
         callback(returnJson ? JSON.parse(data) : data);
+        // callback(JSON.parse(data));
       } catch (err) {
         console.log(err);
       }
