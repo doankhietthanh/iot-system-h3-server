@@ -13,7 +13,6 @@ export const historyRoutes = (app, fs) => {
       }
       try {
         callback(returnJson ? JSON.parse(data) : data);
-        // callback(JSON.parse(data));
       } catch (err) {
         console.log(err);
       }
@@ -74,30 +73,5 @@ export const historyRoutes = (app, fs) => {
     writeFile(JSON.stringify(req.body, null, 2), () => {
       res.status(200).send("new history added");
     });
-  });
-
-  // UPDATE
-  app.put("/history/:id", (req, res) => {
-    readFile((data) => {
-      const userId = req.params["id"];
-      data[userId] = req.body;
-
-      writeFile(JSON.stringify(data, null, 2), () => {
-        res.status(200).send(`history id:${userId} updated`);
-      });
-    }, true);
-  });
-
-  // DELETE
-  app.delete("/history/:id", (req, res) => {
-    readFile((data) => {
-      const userId = req.params["id"];
-      console.log(userId);
-      delete data[userId];
-
-      writeFile(JSON.stringify(data, null, 2), () => {
-        res.status(200).send(`history id:${userId} removed`);
-      });
-    }, true);
   });
 };

@@ -65,23 +65,4 @@ export const locationRoutes = (app, fs) => {
       res.status(200).send("new location added");
     });
   });
-
-  app.post("/location/:name/:node", (req, res) => {
-    readFile((data) => {
-      const name = req.params.name;
-      const node = req.params.node;
-
-      data[name] = {
-        [node]: req.body,
-      };
-
-      console.log(data);
-
-      console.log({ [name]: { [node]: req.body } });
-
-      writeFile(JSON.stringify(data, null, 2), () => {
-        res.status(200).send("new location added");
-      });
-    }, true);
-  });
 };

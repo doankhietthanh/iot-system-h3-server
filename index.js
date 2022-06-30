@@ -51,14 +51,8 @@ const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
 
 let docsHistory = {};
-let docsHistoryPrevious = {};
 let docsLocation = {};
-let docsLocationPrevious = {};
-
 let docsValueSensorsThreshold = {};
-let docsHistoryCurrent = {};
-let nameLocationList = [];
-let nodeList = [];
 
 fs.readFile(dataHistory, (err, data) => {
   docsHistory = JSON.parse(data);
@@ -72,22 +66,17 @@ onValue(ref(database, "settings/sensor"), (snapshot) => {
   docsValueSensorsThreshold = snapshot.val();
 });
 
-get(child(ref(database), "location")).then((snapshot) => {
+onValue(ref(database, "location"), (snapshot) => {
   const data = snapshot.val();
-  console.log(data);
-  nameLocationList = Object.keys(data);
-  nodeList = Object.values(data);
+  const nameLocationList = Object.keys(data);
+  const nodeList = Object.values(data);
 
-  // request.post({
-  //   headers: { "content-type": "application/json" },
-  //   url: endPoint + "current",
-  //   body: JSON.stringify(data),
-  // });
+  request.post({
+    headers: { "content-type": "application/json" },
+    url: endPoint + "current",
+    body: JSON.stringify(data),
+  });
 
-  //io.emit("history", { ...docsHistory });
-});
-
-setTimeout(() => {
   nameLocationList.forEach((nameLocation, index) => {
     const nameNodeList = Object.keys(nodeList[index]);
     const valueNodeList = Object.values(nodeList[index]);
@@ -98,7 +87,7 @@ setTimeout(() => {
           const data = snapshot.val();
           // console.log(data);
           const timestamp = convertDateToTimestamp(data.time);
-          docsHistoryPrevious = docsHistory;
+
           docsHistory[timestamp] = {
             [nameLocation]: {
               [node]: data.sensors,
@@ -108,22 +97,12 @@ setTimeout(() => {
           request.post({
             headers: { "content-type": "application/json" },
             url: endPoint + "history",
-            body: "",
-          });
-
-          request.post({
-            headers: { "content-type": "application/json" },
-            url: endPoint + "history",
             body: JSON.stringify(docsHistory),
           });
 
-          docsLocation[nameLocation][node][timestamp] = data.sensors;
+          io.emit("history", { ...docsHistory });
 
-          request.post({
-            headers: { "content-type": "application/json" },
-            url: endPoint + "location",
-            body: "",
-          });
+          docsLocation[nameLocation][node][timestamp] = data.sensors;
 
           request.post({
             headers: { "content-type": "application/json" },
@@ -152,61 +131,61 @@ setTimeout(() => {
       );
     });
   });
-}, 5000);
+});
 
 setInterval(() => {
   request(endPoint + "current", function (error, response, body) {
     const data = JSON.parse(body);
     const nameLocationList = Object.keys(data);
     const nodeList = Object.values(data);
+
+    let docsNodeDisconnect = [];
+    let docsSensorsOverloadThreshold = [];
+
     nameLocationList.forEach((nameLocation, index) => {
       const nameNodeList = Object.keys(nodeList[index]);
       const valueNodeList = Object.values(nodeList[index]);
+
       nameNodeList.forEach((nameNode, i) => {
         const valueNode = valueNodeList[i];
         const nameSensorList = Object.keys(valueNode.sensors);
         const valueSensorList = Object.values(valueNode.sensors);
-        let nameSensorThresholdList = [];
-        let valueSensorThresholdList = [];
+
         if (valueSensorList.every((value) => value == -1)) {
-          sendEmail(
-            nameLocation,
-            nameNode,
-            nameSensorThresholdList,
-            valueSensorThresholdList,
-            "offline"
-          );
-        } else {
-          nameSensorList.forEach((nameSensor, j) => {
+          docsNodeDisconnect.push([nameLocation, nameNode]);
+        }
+        nameSensorList.forEach((nameSensor, j) => {
+          if (valueSensorList[j] != -1) {
             if (
               parseInt(valueSensorList[j]) <
-              docsValueSensorsThreshold[nameSensor].minT
+                docsValueSensorsThreshold[nameSensor].minT ||
+              parseInt(valueSensorList[j]) >
+                docsValueSensorsThreshold[nameSensor].maxT
             ) {
-              nameSensorThresholdList.push(nameSensor);
-              valueSensorThresholdList.push(valueSensorList[j]);
+              docsSensorsOverloadThreshold.push([
+                nameLocation,
+                nameNode,
+                nameSensor,
+                valueSensorList[j],
+              ]);
             }
-          });
-
-          sendEmail(
-            nameLocation,
-            nameNode,
-            nameSensorThresholdList,
-            valueSensorThresholdList,
-            "threshold"
-          );
-        }
+          }
+        });
       });
     });
-  });
-}, 5 * 60000);
+    console.log(docsNodeDisconnect);
 
-const sendEmail = (
-  nameLocation,
-  nameNode,
-  nameSensorList,
-  valueSensorList,
-  action
-) => {
+    if (docsNodeDisconnect.length > 0) {
+      sendEmail(docsNodeDisconnect, "nodeDisconnect");
+    }
+
+    if (docsSensorsOverloadThreshold.length > 0) {
+      sendEmail(docsSensorsOverloadThreshold, "sensorOverloadThreshold");
+    }
+  });
+}, 1 * 60000);
+
+const sendEmail = (data, action) => {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -214,14 +193,17 @@ const sendEmail = (
       pass: "Thanh2001@", // generated ethereal password
     },
   });
+
   let email;
-  if (action == "threshold") {
-    let tableHtml = "";
-    nameSensorList.forEach((nameSensor, index) => {
-      tableHtml += `
+  if (action == "sensorOverloadThreshold") {
+    let htmls = "";
+    data.forEach((dt, index) => {
+      htmls += `
       <tr>
-        <td style="text-transform: uppercase;" >${nameSensor}</td>
-        <td>${valueSensorList[index]}</td>
+        <td style="padding: 16px; text-align:center">${dt[0]}</td>
+        <td style="padding: 16px; text-align:center">${dt[1]}</td>
+        <td style="padding: 16px; text-align:center">${dt[2]}</td>
+        <td style="padding: 16px; text-align:center">${dt[3]}</td>
       </tr>
       `;
     });
@@ -230,30 +212,41 @@ const sendEmail = (
       to: "19119088@student.hcmute.edu.vn",
       subject: "OVERLOAD THRESHOLD WARNING ⚠️⚠️⚠️",
       html: `
-      <h4>OVERLOAD THRESHOLD WARNING ⚠️⚠️⚠️</h4>
-      <h3 style="text-transform: uppercase;">${nameLocation} - ${nameNode}</h3>
+      <h3>🔥 OVERLOAD THRESHOLD WARNING ⚠️</h3>
+      <table border="1" style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
+        <tr>
+          <th style="padding: 16px">Location</th>
+          <th style="padding: 16px">Node</th>
+          <th style="padding: 16px">Sensor</th>
+          <th style="padding: 16px">Value</th>
+        </tr>
+        ${htmls}
       </table>
-        <thead>
-          <tr>
-            <th>Sensor</th>
-            <th>Value</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${tableHtml}
-        </tbody>
-
-      </table>`,
+      `,
     };
-  } else if (action == "offline") {
+  } else if (action == "nodeDisconnect") {
+    let htmls = "";
+    data.forEach((dt, index) => {
+      htmls += `
+      <tr>
+        <td style="padding: 16px; text-align:center">${dt[0]}</td>
+        <td style="padding: 16px"; text-align:center>${dt[1]}</td>
+      </tr>
+      `;
+    });
     email = {
       from: "19119220@student.hcmute.edu.vn",
       to: "19119088@student.hcmute.edu.vn",
       subject: "DISCONNECTED NODE ❌❌❌",
       html: `
-      <h4>DISCONNECTED NODE ❌❌❌</h4>
-      <h3 style="text-transform: uppercase;">${nameLocation} - ${nameNode} <span> is disconnected ❎</span></h3>
+      <h3>💢🚫 DISCONNECTED NODE 🚫💢</h3>
+      <table border="1" style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
+        <tr>
+          <th style="padding: 16px">Location</th>
+          <th style="padding: 16px">Node</th>
+        </tr>
+        ${htmls}
+      </table>
       `,
     };
   }
