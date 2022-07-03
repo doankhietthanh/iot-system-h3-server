@@ -31,6 +31,8 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+const TIME_SEND_MAIL = 3 * 60000;
+
 const routes = appRouter(app, fs);
 
 const convertDateToTimestamp = (date, time) => {
@@ -45,14 +47,17 @@ const convertDateToTimestamp = (date, time) => {
 };
 
 const endPoint = "https://iot-system-h3-server.herokuapp.com/";
-// const endPoint = "http://localhost:8080/";
+// const endPoint = "http://localhost:3000/";
 
 const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
 
 let docsHistory = {};
 let docsLocation = {};
+let docsHistoryCurrent = {};
 let docsValueSensorsThreshold = {};
+let nameLocationList = [];
+let nodeList = [];
 
 fs.readFile(dataHistory, (err, data) => {
   docsHistory = JSON.parse(data);
@@ -68,15 +73,17 @@ onValue(ref(database, "settings/sensor"), (snapshot) => {
 
 onValue(ref(database, "location"), (snapshot) => {
   const data = snapshot.val();
-  const nameLocationList = Object.keys(data);
-  const nodeList = Object.values(data);
+  nameLocationList = Object.keys(data);
+  nodeList = Object.values(data);
 
   request.post({
     headers: { "content-type": "application/json" },
     url: endPoint + "current",
     body: JSON.stringify(data),
   });
+});
 
+setTimeout(() => {
   nameLocationList.forEach((nameLocation, index) => {
     const nameNodeList = Object.keys(nodeList[index]);
     const valueNodeList = Object.values(nodeList[index]);
@@ -102,13 +109,21 @@ onValue(ref(database, "location"), (snapshot) => {
 
           io.emit("history", { ...docsHistory });
 
-          docsLocation[nameLocation][node][timestamp] = data.sensors;
-
-          request.post({
-            headers: { "content-type": "application/json" },
-            url: endPoint + "location",
-            body: JSON.stringify(docsLocation),
-          });
+          if (docsLocation[nameLocation] != undefined) {
+            if (docsLocation[nameLocation][node] != undefined) {
+              docsLocation[nameLocation][node][timestamp] = data.sensors;
+            } else {
+              docsLocation[nameLocation][node] = {
+                [timestamp]: data.sensors,
+              };
+            }
+          } else {
+            docsLocation[nameLocation] = {
+              [node]: {
+                [timestamp]: data.sensors,
+              },
+            };
+          }
 
           // if (docsLocation[nameLocation] != undefined) {
           //   if (docsLocation[nameLocation][node] != undefined) {
@@ -127,11 +142,17 @@ onValue(ref(database, "location"), (snapshot) => {
           //     },
           //   };
           // }
+
+          request.post({
+            headers: { "content-type": "application/json" },
+            url: endPoint + "location",
+            body: JSON.stringify(docsLocation),
+          });
         }
       );
     });
   });
-});
+}, 5000);
 
 setInterval(() => {
   request(endPoint + "current", function (error, response, body) {
@@ -183,7 +204,7 @@ setInterval(() => {
       sendEmail(docsSensorsOverloadThreshold, "sensorOverloadThreshold");
     }
   });
-}, 1 * 60000);
+}, TIME_SEND_MAIL);
 
 const sendEmail = (data, action) => {
   const transporter = nodemailer.createTransport({
@@ -210,9 +231,9 @@ const sendEmail = (data, action) => {
     email = {
       from: "19119220@student.hcmute.edu.vn",
       to: "19119088@student.hcmute.edu.vn",
-      subject: "OVERLOAD THRESHOLD WARNING ⚠️⚠️⚠️",
+      subject: "[WARNING] OUT OF THRESHOLD ⚠️⚠️⚠️",
       html: `
-      <h3>🔥 OVERLOAD THRESHOLD WARNING ⚠️</h3>
+      <h3>🔥[WARNING] OUT OF THRESHOLD ⚠️</h3>
       <table border="1" style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
         <tr>
           <th style="padding: 16px">Location</th>
@@ -230,7 +251,7 @@ const sendEmail = (data, action) => {
       htmls += `
       <tr>
         <td style="padding: 16px; text-align:center">${dt[0]}</td>
-        <td style="padding: 16px"; text-align:center>${dt[1]}</td>
+        <td style="padding: 16px; text-align:center">${dt[1]}</td>
       </tr>
       `;
     });
@@ -260,5 +281,5 @@ const sendEmail = (data, action) => {
   });
 };
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));
