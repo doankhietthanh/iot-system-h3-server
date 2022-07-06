@@ -41,8 +41,8 @@ const convertDateToTimestamp = (date, time) => {
   return date2.getTime();
 };
 
-// const endPoint = "https://iot-system-h3-server.herokuapp.com/";
-const endPoint = "http://localhost:3000/";
+const endPoint = "https://iot-system-h3-server.herokuapp.com/";
+// const endPoint = "http://localhost:3000/";
 
 const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
