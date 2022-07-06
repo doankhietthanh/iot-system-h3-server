@@ -8,6 +8,8 @@ import request from "request";
 import { Server } from "socket.io";
 import { database, onValue, ref } from "./controller/firebase.js";
 import { appRouter } from "./routes/routes.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
@@ -15,7 +17,6 @@ const io = new Server(server, {
   cors: {
     origin: "*",
     credentials: true, //access-control-allow-credentials:true
-    optionSuccessStatus: 200,
   },
 });
 
@@ -40,8 +41,8 @@ const convertDateToTimestamp = (date, time) => {
   return date2.getTime();
 };
 
-const endPoint = "https://iot-system-h3-server.herokuapp.com/";
-// const endPoint = "http://localhost:3000/";
+// const endPoint = "https://iot-system-h3-server.herokuapp.com/";
+const endPoint = "http://localhost:3000/";
 
 const dataLocation = "./data/location.json";
 const dataHistory = "./data/history.json";
