@@ -1,24 +1,16 @@
 import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
-import nodemailer from "nodemailer";
 import fs from "fs";
+import http from "http";
+import nodemailer from "nodemailer";
 import request from "request";
-import {
-  database,
-  onValue,
-  ref,
-  set,
-  update,
-  get,
-  child,
-} from "./controller/firebase.js";
+import { Server } from "socket.io";
+import { database, onValue, ref } from "./controller/firebase.js";
 import { appRouter } from "./routes/routes.js";
 
 const app = express();
-import http from "http";
 const server = http.createServer(app);
-import { Server } from "socket.io";
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -125,24 +117,6 @@ setTimeout(() => {
             };
           }
 
-          // if (docsLocation[nameLocation] != undefined) {
-          //   if (docsLocation[nameLocation][node] != undefined) {
-          //     docsHistoryCurrent = docsLocation[nameLocation][node];
-          //     docsHistoryCurrent[timestamp] = data.sensors;
-          //     docsLocation[nameLocation][node] = docsHistoryCurrent;
-          //   } else {
-          //     docsLocation[nameLocation][node] = {
-          //       [timestamp]: data.sensors,
-          //     };
-          //   }
-          // } else {
-          //   docsLocation[nameLocation] = {
-          //     [node]: {
-          //       [timestamp]: data.sensors,
-          //     },
-          //   };
-          // }
-
           request.post({
             headers: { "content-type": "application/json" },
             url: endPoint + "location",
@@ -154,57 +128,57 @@ setTimeout(() => {
   });
 }, 5000);
 
-setInterval(() => {
-  request(endPoint + "current", function (error, response, body) {
-    const data = JSON.parse(body);
-    const nameLocationList = Object.keys(data);
-    const nodeList = Object.values(data);
+// setInterval(() => {
+//   request(endPoint + "current", function (error, response, body) {
+//     const data = JSON.parse(body);
+//     const nameLocationList = Object.keys(data);
+//     const nodeList = Object.values(data);
 
-    let docsNodeDisconnect = [];
-    let docsSensorsOverloadThreshold = [];
+//     let docsNodeDisconnect = [];
+//     let docsSensorsOverloadThreshold = [];
 
-    nameLocationList.forEach((nameLocation, index) => {
-      const nameNodeList = Object.keys(nodeList[index]);
-      const valueNodeList = Object.values(nodeList[index]);
+//     nameLocationList.forEach((nameLocation, index) => {
+//       const nameNodeList = Object.keys(nodeList[index]);
+//       const valueNodeList = Object.values(nodeList[index]);
 
-      nameNodeList.forEach((nameNode, i) => {
-        const valueNode = valueNodeList[i];
-        const nameSensorList = Object.keys(valueNode.sensors);
-        const valueSensorList = Object.values(valueNode.sensors);
+//       nameNodeList.forEach((nameNode, i) => {
+//         const valueNode = valueNodeList[i];
+//         const nameSensorList = Object.keys(valueNode.sensors);
+//         const valueSensorList = Object.values(valueNode.sensors);
 
-        if (valueSensorList.every((value) => value == -1)) {
-          docsNodeDisconnect.push([nameLocation, nameNode]);
-        }
-        nameSensorList.forEach((nameSensor, j) => {
-          if (valueSensorList[j] != -1) {
-            if (
-              parseInt(valueSensorList[j]) <
-                docsValueSensorsThreshold[nameSensor].minT ||
-              parseInt(valueSensorList[j]) >
-                docsValueSensorsThreshold[nameSensor].maxT
-            ) {
-              docsSensorsOverloadThreshold.push([
-                nameLocation,
-                nameNode,
-                nameSensor,
-                valueSensorList[j],
-              ]);
-            }
-          }
-        });
-      });
-    });
-    console.log(docsNodeDisconnect);
+//         if (valueSensorList.every((value) => value == -1)) {
+//           docsNodeDisconnect.push([nameLocation, nameNode]);
+//         }
+//         nameSensorList.forEach((nameSensor, j) => {
+//           if (valueSensorList[j] != -1) {
+//             if (
+//               parseInt(valueSensorList[j]) <
+//                 docsValueSensorsThreshold[nameSensor].minT ||
+//               parseInt(valueSensorList[j]) >
+//                 docsValueSensorsThreshold[nameSensor].maxT
+//             ) {
+//               docsSensorsOverloadThreshold.push([
+//                 nameLocation,
+//                 nameNode,
+//                 nameSensor,
+//                 valueSensorList[j],
+//               ]);
+//             }
+//           }
+//         });
+//       });
+//     });
+//     console.log(docsNodeDisconnect);
 
-    if (docsNodeDisconnect.length > 0) {
-      sendEmail(docsNodeDisconnect, "nodeDisconnect");
-    }
+//     if (docsNodeDisconnect.length > 0) {
+//       sendEmail(docsNodeDisconnect, "nodeDisconnect");
+//     }
 
-    if (docsSensorsOverloadThreshold.length > 0) {
-      sendEmail(docsSensorsOverloadThreshold, "sensorOverloadThreshold");
-    }
-  });
-}, TIME_SEND_MAIL);
+//     if (docsSensorsOverloadThreshold.length > 0) {
+//       sendEmail(docsSensorsOverloadThreshold, "sensorOverloadThreshold");
+//     }
+//   });
+// }, TIME_SEND_MAIL);
 
 const sendEmail = (data, action) => {
   const transporter = nodemailer.createTransport({
