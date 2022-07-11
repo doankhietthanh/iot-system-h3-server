@@ -30,11 +30,10 @@ const TIME_SEND_MAIL = 3 * 60000;
 
 const routes = appRouter(app, fs);
 
-const convertDateToTimestamp = (date, time) => {
-  const time1 = date.split(",")[1].split("/");
-  const dateStr =
-    time1[1] + "/" + time1[0] + "/" + "20" + time1[2] + " " + time;
-  const [dateRelated, timeRelated] = dateStr.split(" ");
+const convertDateToTimestamp = (date) => {
+  const dateStr = date.split(",")[1].split(" ")[0].split("/");
+  const dateRelated = dateStr[1] + "/" + dateStr[0] + "/" + "20" + dateStr[2];
+  const timeRelated = date.split(",")[1].split(" ")[1];
   const [month, day, year] = dateRelated.split("/");
   const [hours, minutes, seconds] = timeRelated.split(":");
   const date2 = new Date(+year, month - 1, +day, +hours, +minutes, +seconds);
