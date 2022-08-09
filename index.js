@@ -31,6 +31,7 @@ const TIME_SEND_MAIL = 3 * 60000;
 const routes = appRouter(app, fs);
 
 const convertDateToTimestamp = (date) => {
+  if (!date) return;
   const dateStr = date.split(",")[1].split(" ")[0].split("/");
   const dateRelated = dateStr[1] + "/" + dateStr[0] + "/" + "20" + dateStr[2];
   const timeRelated = date.split(",")[1].split(" ")[1];
@@ -88,9 +89,10 @@ setTimeout(() => {
           const data = snapshot.val();
 
           io.emit("sensor", {
-            nameLocation,
-            node,
-            data,
+            location: nameLocation,
+            node: node,
+            sensors: data.sensors,
+            timestamp: convertDateToTimestamp(data.time),
           });
 
           const timestamp = convertDateToTimestamp(data.time);
