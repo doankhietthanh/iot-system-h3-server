@@ -86,7 +86,13 @@ setTimeout(() => {
         ref(database, "location/" + nameLocation + "/" + node),
         (snapshot) => {
           const data = snapshot.val();
-          // console.log(data);
+
+          io.emit("sensor", {
+            nameLocation,
+            node,
+            data,
+          });
+
           const timestamp = convertDateToTimestamp(data.time);
 
           docsHistory[timestamp] = {
