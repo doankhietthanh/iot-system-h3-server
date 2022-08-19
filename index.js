@@ -51,8 +51,8 @@ let docsHistory = {};
 let docsLocation = {};
 let docsHistoryCurrent = {};
 let docsValueSensorsThreshold = {};
-let nameLocationList = [];
-let nodeList = [];
+// let nameLocationList = [];
+// let nodeList = [];
 
 fs.readFile(dataHistory, (err, data) => {
   docsHistory = JSON.parse(data);
@@ -68,17 +68,15 @@ onValue(ref(database, "settings/sensor"), (snapshot) => {
 
 onValue(ref(database, "location"), (snapshot) => {
   const data = snapshot.val();
-  nameLocationList = Object.keys(data);
-  nodeList = Object.values(data);
+  const nameLocationList = Object.keys(data);
+  const nodeList = Object.values(data);
 
   request.post({
     headers: { "content-type": "application/json" },
     url: endPoint + "current",
     body: JSON.stringify(data),
   });
-});
 
-setTimeout(() => {
   nameLocationList.forEach((nameLocation, index) => {
     const nameNodeList = Object.keys(nodeList[index]);
     const valueNodeList = Object.values(nodeList[index]);
@@ -87,6 +85,7 @@ setTimeout(() => {
         ref(database, "location/" + nameLocation + "/" + node),
         (snapshot) => {
           const data = snapshot.val();
+          if (!data) return;
 
           io.emit("sensor", {
             location: nameLocation,
@@ -136,7 +135,9 @@ setTimeout(() => {
       );
     });
   });
-}, 5000);
+});
+
+setTimeout(() => {}, 5000);
 
 // setInterval(() => {
 //   request(endPoint + "current", function (error, response, body) {
@@ -264,6 +265,43 @@ const sendEmail = (data, action) => {
     }
   });
 };
+
+io.on("connection", (socket) => {
+  socket.on("remove-location", (data) => {
+    const timestampListHistory = Object.keys(docsHistory);
+    const dataListHistory = Object.values(docsHistory);
+
+    timestampListHistory.forEach((timestamp, index) => {
+      const nameLocationList = Object.keys(dataListHistory[index]);
+      const nodeList = Object.values(dataListHistory[index]);
+
+      nameLocationList.forEach((nameLocation, i) => {
+        if (nameLocation === data) {
+          delete docsHistory[timestamp];
+        }
+      });
+    });
+
+    request.post({
+      headers: { "content-type": "application/json" },
+      url: endPoint + "history",
+      body: JSON.stringify(docsHistory),
+    });
+
+    const nameLocationListLocation = Object.keys(docsLocation);
+    nameLocationListLocation.forEach((nameLocation, index) => {
+      if (nameLocation === data) {
+        delete docsLocation[nameLocation];
+      }
+    });
+
+    request.post({
+      headers: { "content-type": "application/json" },
+      url: endPoint + "location",
+      body: JSON.stringify(docsLocation),
+    });
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, console.log(`Server Run With Port ${PORT}`));
